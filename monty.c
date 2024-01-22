@@ -1,77 +1,55 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include "monty.h"
 
-#define STACK_SIZE 1000
-
-typedef struct {
-    int stack[STACK_SIZE];
-    int top;
-} Stack;
-
-Stack stack;
-
-void push(int value, int line_number) {
-    if (stack.top == STACK_SIZE - 1) {
-        fprintf(stderr, "L%d: Error: Stack overflow\n", line_number);
-        exit(EXIT_FAILURE);
+void push(MontyStack *stack, int value) {
+    if (stack->size < STACK_MAX) {
+        stack->data[stack->size++] = value;
+    } else {
+        handle_error(__LINE__, "stack overflow");
     }
-    stack.stack[++stack.top] = value;
 }
 
-void pall() {
+void pall(MontyStack *stack) {
     int i;
-    for (i = stack.top; i >= 0; i--) {
-        printf("%d\n", stack.stack[i]);
+    for (i = stack->size - 1; i >= 0; i--) {
+        printf("%d\n", stack->data[i]);
     }
+}
+
+
+void handle_error(int line_number, const char *message) {
+    fprintf(stderr, "L%d: %s\n", line_number, message);
+    exit(EXIT_FAILURE);
 }
 
 int main(int argc, char *argv[]) {
-    FILE *file;
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
-    int line_number = 0;
-
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <file>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
-    file = fopen(argv[1], "r");
-    if (file == NULL) {
+    FILE *file = fopen(argv[1], "r");
+    if (!file) {
         fprintf(stderr, "Error: Can't open file %s\n", argv[1]);
         exit(EXIT_FAILURE);
     }
 
-    stack.top = -1;
+    MontyStack stack = { .size = 0 };
 
-    while ((read = getline(&line, &len, file)) != -1) {
+    char line[100];
+    int line_number = 0;
+
+    while (fgets(line, sizeof(line), file) != NULL) {
         line_number++;
 
-        if (line[0] == '\n' || line[0] == '#') {
-            continue;
-        }
-
-        char opcode[5];
-        int value;
-
-        if (sscanf(line, "%4s %d", opcode, &value) == 2) {
-            if (strcmp(opcode, "push") == 0) {
-                push(value, line_number);
-            } else if (strcmp(opcode, "pall") == 0) {
-                pall();
-            } else {
-                fprintf(stderr, "L%d: Error: Unknown opcode %s\n", line_number, opcode);
-                exit(EXIT_FAILURE);
-            }
+        if (sscanf(line, "push %d", &value) == 1) {
+            push(&stack, value);
+        } else if (strcmp(line, "pall\n") == 0) {
+            pall(&stack);
         } else {
-            fprintf(stderr, "L%d: Error: Invalid instruction\n", line_number);
-            exit(EXIT_FAILURE);
+            handle_error(line_number, "unknown opcode");
         }
     }
 
-    free(line);
     fclose(file);
-
     return 0;
 }
